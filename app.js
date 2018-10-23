@@ -12,13 +12,7 @@ mongoose.connect('mongodb://localhost:27017/nodemountain', { useNewUrlParser: tr
   .then(() => console.log('DB Connected!'))
   .catch(err => console.error(err));
 
-const ProxyModel = require('./proxyModel')
-
-const test = new ProxyModel({
-  port: 5555,
-  subdomain: 'apa.nodethat.net'
-})
-
+const ProxyModel = require('./proxyModel');
 
 mongoose.connection.once('open', start);
 
