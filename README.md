@@ -1,1 +1,3 @@
-reverse-proxy-mongodb
+# reverse-proxy-mongodb
+
+Node reverse proxy with MongoDB storage

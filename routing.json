@@ -1,0 +1,7 @@
+{
+  "nodethat.net": 3000,
+  "www.nodethat.net": {
+    "redirect": "nodethat.net"
+  },
+  "sub.nodethat.net": 3010 
+}
