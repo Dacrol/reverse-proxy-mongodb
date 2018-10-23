@@ -5,7 +5,6 @@ const httpProxy = require('http-proxy');
 const tls = require('tls');
 const fs = require('fs');
 const path = require('path');
-const exec = require('child_process').exec;
 const mongoose = require('mongoose');
 
 mongoose.connect('mongodb://localhost:27017/nodemountain', { useNewUrlParser: true })
