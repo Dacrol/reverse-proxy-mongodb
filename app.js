@@ -6,6 +6,8 @@ const tls = require('tls');
 const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
+const defaultRoutes = require('./routing.json')
+const ipc = require('node-ipc');
 
 mongoose.connect('mongodb://localhost:27017/nodemountain', { useNewUrlParser: true })
   .then(() => console.log('DB Connected!'))
@@ -17,14 +19,25 @@ mongoose.connection.once('open', start);
 
 async function start() {
 
-  // Read our routes
-  const routesFromDB = await ProxyModel.find({})
-
-  let routes = require('./routing.json')
-  routesFromDB.forEach(route => {
-    Object.assign(routes, {[route.subdomain]: route.port})
-  })
+  let routes
+  let reloadRoutes;
+  (reloadRoutes = async () => {
+    routes = defaultRoutes
+    // Read our routes
+    const routesFromDB = await ProxyModel.find({})
+    routesFromDB.forEach(route => {
+      Object.assign(routes, {[route.subdomain]: route.port})
+    })
+  })()
     
+  // Setup interprocess communication for reloading the routes
+  ipc.config.id = 'reverse-proxy';
+  ipc.config.retry = 1500;
+  ipc.config.silent = true;
+  ipc.serve(() => ipc.server.on('reloadroutes', message => {
+    reloadRoutes();
+  }));
+  ipc.server.start();
 
   console.log(routes)
   // const routes = require('./routing.json');
