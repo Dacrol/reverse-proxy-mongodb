@@ -13,7 +13,7 @@ mongoose.connect('mongodb://localhost:27017/nodemountain', { useNewUrlParser: tr
   .then(() => console.log('DB Connected!'))
   .catch(err => console.error(err));
 
-const ProxyModel = require('./proxyModel');
+const proxyModel = require('./proxyModel');
 
 mongoose.connection.once('open', start);
 
@@ -24,19 +24,32 @@ async function start() {
   (reloadRoutes = async () => {
     routes = defaultRoutes
     // Read our routes
-    const routesFromDB = await ProxyModel.find({})
+    const routesFromDB = await proxyModel.find({})
     routesFromDB.forEach(route => {
       Object.assign(routes, {[route.subdomain]: route.port})
     })
   })()
     
+  class WakeNotifier {
+    constructor() {
+      this.notifyDone = () => {}
+      this.donePromise = new Promise((resolve, reject) => {
+        this.notifyDone = resolve;
+      })
+    }
+  }
+
   // Setup interprocess communication for reloading the routes
   ipc.config.id = 'reverse-proxy';
   ipc.config.retry = 1500;
   ipc.config.silent = true;
-  ipc.serve(() => ipc.server.on('reloadroutes', message => {
-    reloadRoutes();
-  }));
+  ipc.serve(() => {
+    ipc.server.on('reloadroutes', message => {
+      console.log('Reloading routes');
+      reloadRoutes();
+    })
+    ipc.server.on('done-waking', notifyDone)
+  });
   ipc.server.start();
 
   console.log(routes)
@@ -71,7 +84,7 @@ async function start() {
   https.createServer({
     key: certs['nodethat.net'].key,
     cert: certs['nodethat.net'].cert
-  }, (req, res) => {
+  }, async (req, res) => {
 
     // Set/replace response headers
     setResponseHeaders(req, res);
@@ -105,6 +118,19 @@ async function start() {
 
     // Serve the correct app for a domain
     else if (portToUse) {
+      // If proxy asleep => wake process
+      const proxyProcess = await proxyModel.findOne({
+        "port": portToUse
+      });
+      if (proxyProcess.asleep && !proxyProcess.online) {
+        ipc.connectTo('node-mountain', () => {
+          ipc.of['node-mountain'].on('connect', () => {
+            console.log('Emitting wake-process');
+            ipc.of['node-mountain'].emit('wake-process', proxyProcess.processInfo.processName);
+            ipc.disconnect('node-mountain');
+          });
+        });
+      }
       proxy.web(req, res, { target: 'http://127.0.0.1:' + portToUse });
     }
     else {
