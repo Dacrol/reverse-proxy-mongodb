@@ -32,12 +32,14 @@ async function start() {
     
   class WakeNotifier {
     constructor() {
-      this.notifyDone = () => {}
+      this.notifyDone = () => {};
       this.donePromise = new Promise((resolve, reject) => {
         this.notifyDone = resolve;
       })
     }
   }
+
+  let wakeNotifiers = {};
 
   // Setup interprocess communication for reloading the routes
   ipc.config.id = 'reverse-proxy';
@@ -48,7 +50,9 @@ async function start() {
       console.log('Reloading routes');
       reloadRoutes();
     })
-    ipc.server.on('done-waking', notifyDone)
+    ipc.server.on('done-waking', processName => {
+      if (wakeNotifiers[processName] && wakeNotifiers[processName].notifyDone) wakeNotifiers[processName].notifyDone();
+    })
   });
   ipc.server.start();
 
@@ -124,14 +128,18 @@ async function start() {
       });
       if (proxyProcess.asleep && !proxyProcess.online) {
         ipc.connectTo('node-mountain', () => {
-          ipc.of['node-mountain'].on('connect', () => {
+          ipc.of['node-mountain'].on('connect', async () => {
+            wakeNotifiers[proxyProcess.processInfo.processName] = new WakeNotifier()
             console.log('Emitting wake-process');
             ipc.of['node-mountain'].emit('wake-process', proxyProcess.processInfo.processName);
             ipc.disconnect('node-mountain');
+            await wakeNotifiers[proxyProcess.processInfo.processName].donePromise
+            proxy.web(req, res, { target: 'http://127.0.0.1:' + portToUse });
           });
         });
+      } else {
+        proxy.web(req, res, { target: 'http://127.0.0.1:' + portToUse });
       }
-      proxy.web(req, res, { target: 'http://127.0.0.1:' + portToUse });
     }
     else {
       res.statusCode = 404;
