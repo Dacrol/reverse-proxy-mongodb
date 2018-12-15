@@ -131,7 +131,7 @@ async function start() {
           const proxyProcess = await proxyModel.findOne({
             port: portToUse
           });
-          if (proxyProcess.asleep && !proxyProcess.online) {
+          if (proxyProcess && proxyProcess.asleep && !proxyProcess.online) {
             ipc.connectTo('node-mountain', () => {
               ipc.of['node-mountain'].on('connect', async () => {
                 wakeNotifiers[
