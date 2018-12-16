@@ -154,7 +154,10 @@ async function start() {
             });
           } else {
             proxy.web(req, res, { target: 'http://127.0.0.1:' + portToUse });
-
+            if (proxyProcess) {
+              proxyProcess.lastActive = Date.now();
+              proxyProcess.save();
+            }
           }
         } else {
           res.statusCode = 404;
