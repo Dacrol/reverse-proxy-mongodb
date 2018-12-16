@@ -9,6 +9,8 @@ const mongoose = require('mongoose');
 const defaultRoutes = require('./routing.json');
 const ipc = require('node-ipc');
 
+const targetProcess = 'node-mountain';
+
 mongoose
   .connect(
     'mongodb://localhost:27017/nodemountain',
@@ -132,17 +134,17 @@ async function start() {
             port: portToUse
           });
           if (proxyProcess && proxyProcess.asleep && !proxyProcess.online) {
-            ipc.connectTo('node-mountain', () => {
-              ipc.of['node-mountain'].on('connect', async () => {
+            ipc.connectTo(targetProcess, () => {
+              ipc.of[targetProcess].on('connect', async () => {
                 wakeNotifiers[
                   proxyProcess.processInfo.processName
                 ] = new WakeNotifier();
                 console.log('Emitting wake-process');
-                ipc.of['node-mountain'].emit(
+                ipc.of[targetProcess].emit(
                   'wake-process',
                   proxyProcess.processInfo.processName
                 );
-                ipc.disconnect('node-mountain');
+                ipc.disconnect(targetProcess);
                 await wakeNotifiers[proxyProcess.processInfo.processName]
                   .donePromise;
                 proxy.web(req, res, {
@@ -152,6 +154,7 @@ async function start() {
             });
           } else {
             proxy.web(req, res, { target: 'http://127.0.0.1:' + portToUse });
+
           }
         } else {
           res.statusCode = 404;
